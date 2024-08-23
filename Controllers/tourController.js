@@ -1,10 +1,11 @@
 //const fs = require('fs');
-
+const APIFeatures = require('../utils/apiFeatures');
 const Tour = require('../Models/tourModel');
 
 //const tours = JSON.parse(
 //  fs.readFileSync(`${__dirname}/../starter/dev-data/data/tours-simple.json`),
 //);
+
 exports.aliasCheapTours = (req, res, next) => {
   req.query.limit = '5';
   req.query.sort = '-ratingAverage,price';
@@ -14,44 +15,13 @@ exports.aliasCheapTours = (req, res, next) => {
 
 exports.getAllTours = async (req, res) => {
   try {
-    //Filtering
-    const allqueries = { ...req.query };
-    const restrictedqueries = ['limit', 'page', 'sort', 'fields'];
-    restrictedqueries.forEach((el) => delete allqueries[el]);
-    //Advanced filtering
-    let queryStr = JSON.stringify(allqueries);
-    queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
+    const features = new APIFeatures(Tour.find(), req.query)
+      .filter()
+      .sort()
+      .limitFields()
+      .paginate();
 
-    let query = Tour.find(JSON.parse(queryStr));
-
-    //Sorting
-    if (req.query.sort) {
-      const sortQuery = req.query.sort.split(',').join(' ');
-      query = query.sort(sortQuery);
-    } else {
-      query = query.sort('-createdAt');
-    }
-    //Limiting
-    if (req.query.fields) {
-      const fields = req.query.fields.split(',').join(' ');
-      query = query.select(fields);
-    } else {
-      query = query.select('-__v');
-    }
-
-    //Pagination
-    const page = req.query.page * 1 || 1;
-    const limit = req.query.limit * 1 || 100;
-    const skip = (page - 1) * limit;
-    query = query.skip(skip).limit(limit);
-    if (req.query.page) {
-      const numTour = await Tour.countDocuments();
-      if (skip > numTour) {
-        throw new Error('This page does not exist');
-      }
-    }
-
-    const allTours = await query;
+    const allTours = await features.query;
     res.status(200).json({
       status: 'Success',
 
